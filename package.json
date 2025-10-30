@@ -1,0 +1,23 @@
+{
+  "name": "css-colorcoder",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kesarasra/plugins.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kesarasra/plugins/issues"
+  },
+  "homepage": "https://github.com/kesarasra/plugins#readme",
+  "description": "",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
