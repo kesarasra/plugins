@@ -1,0 +1,274 @@
+# ColorCoder — simple HTML/CSS/JS app
+
+This single-file project includes a Node.js static server and a single-page frontend that uses Bootstrap and Tailwind (CDNs) to provide a GUI color picker, complementary color, shades, conversions (HEX/RGB/HSL), grayscale shades, and recommended font-weight stack for headings and paragraph.
+
+--- package.json ---
+```json
+{
+  "name": "colorcoder",
+  "version": "1.0.0",
+  "description": "Simple color utility app (ColorCoder)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
+```
+
+--- server.js ---
+```js
+const express = require('express');
+const path = require('path');
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.listen(PORT, () => console.log(`ColorCoder running at http://localhost:${PORT}`));
+```
+
+--- public/index.html ---
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ColorCoder</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Tailwind Play CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* small custom styles */
+    body { padding: 2rem; }
+    .swatch { width: 100%; height: 80px; border-radius: .5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+    .mono-swatch { display:flex; gap:8px; }
+    .mono-swatch > div { flex:1; height:48px; border-radius:6px }
+    .code-block { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace; font-size: .9rem; }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div class="container">
+    <h1 class="mb-3">ColorCoder</h1>
+    <p class="lead">Pick a color and see its complement, shades, codes, grayscale and font-weight recommendations.</p>
+
+    <div class="row gy-3">
+      <div class="col-md-4">
+        <div class="card p-3">
+          <label class="form-label">Choose color</label>
+          <input id="colorInput" type="color" class="form-control form-control-color" value="#3b82f6">
+          <label class="form-label mt-3">Hex / input</label>
+          <input id="hexInput" class="form-control" placeholder="#3b82f6">
+          <button id="applyHex" class="btn btn-primary mt-2">Apply HEX</button>
+        </div>
+
+        <div class="card p-3 mt-3">
+          <h5>Font weight recommendations</h5>
+          <ul id="fontWeights">
+            <li>h1: 700 (bold)</li>
+            <li>h2: 600 (semibold)</li>
+            <li>h3: 500 (medium)</li>
+            <li>p: 400 (regular)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="col-md-8">
+        <div class="card p-3 mb-3">
+          <div class="row">
+            <div class="col-md-6">
+              <label class="form-label">Selected color</label>
+              <div id="selSwatch" class="swatch mb-2"></div>
+              <pre id="selCodes" class="code-block p-2 bg-white rounded">/* color codes */</pre>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Complementary</label>
+              <div id="compSwatch" class="swatch mb-2"></div>
+              <pre id="compCodes" class="code-block p-2 bg-white rounded">/* complement codes */</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-3 mb-3">
+          <h5>Shades (selected color)</h5>
+          <div id="shadesRow" class="d-flex gap-2"></div>
+        </div>
+
+        <div class="card p-3 mb-3">
+          <h5>Shades (complement)</h5>
+          <div id="shadesCompRow" class="d-flex gap-2"></div>
+        </div>
+
+        <div class="card p-3 mb-3">
+          <h5>Greyscale suggestions</h5>
+          <div id="monoRow" class="mono-swatch mt-2"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="card p-3 mt-4">
+      <h5>Preview (font-weight stack applied)</h5>
+      <div class="p-3">
+        <h1 id="p-h1" class="mb-2">Heading 1 — ColorCoder</h1>
+        <h2 id="p-h2" class="mb-2">Heading 2 — Subheading</h2>
+        <h3 id="p-h3" class="mb-2">Heading 3 — Smaller</h3>
+        <p id="p-p">This is a paragraph example. The app recommends a font-weight stack for readable hierarchy.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Utility: hex <-> RGB <-> HSL conversions and helpers
+    function hexToRgb(hex) {
+      const h = hex.replace('#','');
+      const bigint = parseInt(h, 16);
+      return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+    }
+    function rgbToHex(r,g,b){
+      return '#' + [r,g,b].map(x=>{
+        const s = x.toString(16);
+        return s.length===1 ? '0'+s : s;
+      }).join('');
+    }
+    function rgbToHsl(r,g,b){
+      r/=255; g/=255; b/=255;
+      const max = Math.max(r,g,b), min = Math.min(r,g,b);
+      let h, s, l = (max+min)/2;
+      if(max===min){ h = s = 0; }
+      else {
+        const d = max - min;
+        s = l > .5 ? d/(2-max-min) : d/(max+min);
+        switch(max){
+          case r: h = (g-b)/d + (g < b ? 6 : 0); break;
+          case g: h = (b-r)/d + 2; break;
+          case b: h = (r-g)/d + 4; break;
+        }
+        h /= 6;
+      }
+      return { h: Math.round(h*360), s: Math.round(s*100), l: Math.round(l*100) };
+    }
+    function hslToRgb(h,s,l){
+      h/=360; s/=100; l/=100;
+      let r,g,b;
+      if(s===0){ r=g=b=l; }
+      else {
+        const hue2rgb = (p,q,t)=>{
+          if(t<0) t+=1; if(t>1) t-=1;
+          if(t<1/6) return p + (q-p)*6*t;
+          if(t<1/2) return q;
+          if(t<2/3) return p + (q-p)*(2/3 - t)*6;
+          return p;
+        }
+        const q = l < .5 ? l * (1 + s) : l + s - l*s;
+        const p = 2*l - q;
+        r = hue2rgb(p,q,h + 1/3);
+        g = hue2rgb(p,q,h);
+        b = hue2rgb(p,q,h - 1/3);
+      }
+      return { r: Math.round(r*255), g: Math.round(g*255), b: Math.round(b*255) };
+    }
+
+    function invertHue(h){ return (h + 180) % 360; }
+
+    // generate shades: take HSL and vary L by +- steps
+    function generateShades(h,s,l,count=5){
+      const steps = [];
+      const spread = 30; // total spread percent
+      const step = spread / (count-1);
+      const start = l - spread/2;
+      for(let i=0;i<count;i++){
+        let Li = Math.max(0, Math.min(100, Math.round(start + i*step)));
+        const rgb = hslToRgb(h,s,Li);
+        steps.push({ h, s, l: Li, rgb, hex: rgbToHex(rgb.r,rgb.g,rgb.b) });
+      }
+      return steps;
+    }
+
+    function toRgbString(rgb){ return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`; }
+
+    function updateAll(hex){
+      try {
+        if(!/^#?[0-9A-Fa-f]{6}$/.test(hex)) throw new Error('bad hex');
+        if(hex[0] !== '#') hex = '#'+hex;
+        document.getElementById('colorInput').value = hex;
+        document.getElementById('hexInput').value = hex;
+        const rgb = hexToRgb(hex);
+        const hsl = rgbToHsl(rgb.r,rgb.g,rgb.b);
+        const compH = invertHue(hsl.h);
+        const compRgb = hslToRgb(compH,hsl.s,hsl.l);
+        const compHex = rgbToHex(compRgb.r,compRgb.g,compRgb.b);
+
+        // update swatches
+        document.getElementById('selSwatch').style.background = hex;
+        document.getElementById('compSwatch').style.background = compHex;
+
+        // codes
+        document.getElementById('selCodes').innerText = `HEX: ${hex}\nRGB: ${toRgbString(rgb)}\nHSL: hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
+        document.getElementById('compCodes').innerText = `HEX: ${compHex}\nRGB: ${toRgbString(compRgb)}\nHSL: hsl(${compH}, ${hsl.s}%, ${hsl.l}%)`;
+
+        // shades for both
+        const shades = generateShades(hsl.h,hsl.s,hsl.l,5);
+        const shadesComp = generateShades(compH,hsl.s,hsl.l,5);
+        const shadesRow = document.getElementById('shadesRow');
+        const shadesCompRow = document.getElementById('shadesCompRow');
+        shadesRow.innerHTML = ''; shadesCompRow.innerHTML = '';
+        shades.forEach(s=>{
+          const d = document.createElement('div'); d.style.width='80px'; d.style.borderRadius='6px'; d.style.height='48px'; d.style.background = s.hex; d.title = s.hex; shadesRow.appendChild(d);
+        });
+        shadesComp.forEach(s=>{
+          const d = document.createElement('div'); d.style.width='80px'; d.style.borderRadius='6px'; d.style.height='48px'; d.style.background = s.hex; d.title = s.hex; shadesCompRow.appendChild(d);
+        });
+
+        // grayscale suggestions: map selected luminance to greys
+        const monoRow = document.getElementById('monoRow'); monoRow.innerHTML='';
+        const greys = [20,40,60,80,95];
+        greys.forEach(g => {
+          const gray = rgbToHex(...Object.values(hslToRgb(0,0,g)));
+          const el = document.createElement('div'); el.style.background = gray; el.title = `#${gray.replace('#','')}`; monoRow.appendChild(el);
+        });
+
+        // font-weight preview: apply recommended weights
+        document.getElementById('p-h1').style.color = hex; document.getElementById('p-h2').style.color = hex; document.getElementById('p-h3').style.color = hex; document.getElementById('p-p').style.color = '#333';
+        document.getElementById('p-h1').style.fontWeight = 700;
+        document.getElementById('p-h2').style.fontWeight = 600;
+        document.getElementById('p-h3').style.fontWeight = 500;
+        document.getElementById('p-p').style.fontWeight = 400;
+
+      } catch(e){ console.warn('update error', e); }
+    }
+
+    // event wiring
+    document.getElementById('colorInput').addEventListener('input', e => updateAll(e.target.value));
+    document.getElementById('applyHex').addEventListener('click', ()=> updateAll(document.getElementById('hexInput').value.trim()));
+
+    // init
+    updateAll(document.getElementById('colorInput').value);
+  </script>
+</body>
+</html>
+```
+
+--- README.md ---
+```md
+# ColorCoder
+
+Simple color utility app. Requirements: Node.js (v14+). Installation:
+
+1. `npm install`
+2. `npm start`
+3. Open http://localhost:3000
+
+This project includes a minimal Express static server and a single-page frontend. You can expand it by adding color libraries, saving palettes, or exporting CSS variables.
+```
+
+--- NOTES ---
+
+- This is intentionally minimal and client-heavy — color mathematics run in the browser.
+- Tailwind is used via Play CDN for quick utility classes; for production build, use a proper Tailwind build step.
+
+
